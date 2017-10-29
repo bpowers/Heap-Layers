@@ -118,7 +118,7 @@ namespace HL {
       }
     }
 
-    enum { INITIAL_NUM_BINS = 511 };
+    enum { INITIAL_NUM_BINS = 509 };
 
     class ListNode {
     public:
