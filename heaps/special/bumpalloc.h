@@ -3,21 +3,21 @@
 /*
 
   Heap Layers: An Extensible Memory Allocation Infrastructure
-  
+
   Copyright (C) 2000-2012 by Emery Berger
   http://www.cs.umass.edu/~emery
   emery@cs.umass.edu
-  
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation; either version 2 of the License, or
   (at your option) any later version.
-  
+
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
-  
+
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software
   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
@@ -29,7 +29,9 @@
 
 #include <cstddef>
 
-#include "utility/gcd.h"
+#include "../../utility/gcd.h"
+
+#include "common.h"
 
 #if defined(__clang__)
 #pragma clang diagnostic push
@@ -44,68 +46,61 @@
 
 namespace HL {
 
-  template <size_t ChunkSize,
-	    class SuperHeap,
-	    size_t Alignment_ = 1UL>
-  class BumpAlloc : public SuperHeap {
-  public:
+template <size_t ChunkSize, class SuperHeap, size_t Alignment_ = 1UL>
+class BumpAlloc : public SuperHeap {
+public:
+  enum { Alignment = Alignment_ };
 
-    enum { Alignment = Alignment_ };
+  BumpAlloc() : _bump(NULL), _remaining(0) {
+    static_assert((int)gcd<ChunkSize, Alignment>::VALUE == Alignment, "Alignment must be satisfiable.");
+    static_assert((int)gcd<SuperHeap::Alignment, Alignment>::VALUE == Alignment,
+                  "Alignment must be compatible with the SuperHeap's alignment.");
+    static_assert((Alignment & (Alignment - 1)) == 0, "Alignment must be a power of two.");
+  }
 
-    BumpAlloc()
-      : _bump (NULL),
-	_remaining (0)
-    {
-      static_assert((int) gcd<ChunkSize, Alignment>::VALUE == Alignment,
-		    "Alignment must be satisfiable.");
-      static_assert((int) gcd<SuperHeap::Alignment, Alignment>::VALUE == Alignment,
-		    "Alignment must be compatible with the SuperHeap's alignment.");
-      static_assert((Alignment & (Alignment-1)) == 0,
-		    "Alignment must be a power of two.");
+  inline void *malloc(size_t sz) {
+    // mesh::debug("BumpAlloc(%p)::malloc(%zu)\n", this, sz);
+    // Round up the size if necessary.
+    size_t newSize = (sz + Alignment - 1UL) & ~(Alignment - 1UL);
+
+    // If there's not enough space left to fulfill this request, get
+    // another chunk.
+    if (_remaining < newSize) {
+      refill(newSize);
     }
+    // Bump that pointer.
+    char *old = _bump;
+    _bump += newSize;
+    _remaining -= newSize;
 
-    inline void * malloc (size_t sz) {
-      // Round up the size if necessary.
-      size_t newSize = (sz + Alignment - 1UL) & ~(Alignment - 1UL);
+    assert((size_t)old % Alignment == 0);
+    return old;
+  }
 
-      // If there's not enough space left to fulfill this request, get
-      // another chunk.
-      if (_remaining < newSize) {
-      	refill(newSize);
-      }
-      // Bump that pointer.
-      char * old = _bump;
-      _bump += newSize;
-      _remaining -= newSize;
+  /// Free is disabled (we only bump, never reclaim).
+  inline bool free(void *) {
+    return false;
+  }
 
-      assert ((size_t) old % Alignment == 0);
-      return old;
+private:
+  /// The bump pointer.
+  char *_bump;
+
+  /// How much space remains in the current chunk.
+  size_t _remaining;
+
+  // Get another chunk.
+  void refill(size_t sz) {
+    if (sz < ChunkSize) {
+      sz = ChunkSize;
     }
+    _bump = (char *)SuperHeap::malloc(sz);
+    assert((size_t)_bump % Alignment == 0);
+    _remaining = sz;
+  }
+};
 
-    /// Free is disabled (we only bump, never reclaim).
-    inline bool free (void *) { return false; }
-
-  private:
-
-    /// The bump pointer.
-    char * _bump;
-
-    /// How much space remains in the current chunk.
-    size_t _remaining;
-
-    // Get another chunk.
-    void refill (size_t sz) {
-      if (sz < ChunkSize) {
-      	sz = ChunkSize;
-      }
-      _bump = (char *) SuperHeap::malloc (sz);
-      assert ((size_t) _bump % Alignment == 0);
-      _remaining = sz;
-    }
-
-  };
-
-}
+}  // namespace HL
 
 #if defined(__clang__)
 #pragma clang diagnostic pop
