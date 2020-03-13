@@ -1,5 +1,5 @@
 // -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil -*-
-// Copyright 2019 The Heap-Layers Authors. All rights reserved.
+// Copyright 2020 The Heap-Layers Authors. All rights reserved.
 // Use of this source code is governed by the Apache License,
 // Version 2.0, that can be found in the COPYING file.
 
@@ -8,6 +8,8 @@
 #define HL_WRAPPER_COMMON_H
 
 #include <errno.h>
+
+#include "../heaplayers-common.h"
 
 // To use this library,
 // you only need to define the following allocation functions:
@@ -36,15 +38,6 @@
 //   heaps used by a given allocator; however, such support is only
 //   required by programs that also call fork(). In case your program
 //   does not, the lock and unlock calls given below can be no-ops.
-
-#if defined(__linux__) || defined(__APPLE__)
-#define HL_EXPORT __attribute__((visibility("default")))
-#else
-#define HL_EXPORT
-#endif
-
-#define HL_ATTRIBUTE_NEVER_INLINE __attribute__((noinline))
-#define HL_ATTRIBUTE_ALWAYS_INLINE __attribute__((always_inline))
 
 #ifndef HL_EXPORT_PREFIX
 #define HL_EXPORT_PREFIX xx
