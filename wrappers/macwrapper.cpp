@@ -11,67 +11,18 @@
 #error "This file is for use on Mac OS only."
 #endif
 
-#include <cstdlib>
-using namespace std;
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <malloc/malloc.h>
+#include <assert.h>
 #include <errno.h>
-
 #include <unistd.h>
 
-/*
-  To use this library,
-  you only need to define the following allocation functions:
-  
-  - xxmalloc
-  - xxfree
-  - xxmalloc_usable_size
-  - xxmalloc_lock
-  - xxmalloc_unlock
-  
-  See the extern "C" block below for function prototypes and more
-  details. YOU SHOULD NOT NEED TO MODIFY ANY OF THE CODE HERE TO
-  SUPPORT ANY ALLOCATOR.
+#include <cstdlib>
+#include <cstdio>
+#include <cstring>
 
+#include <malloc/malloc.h>
 
-  LIMITATIONS:
+#include "wrapper-common.h"
 
-  - This wrapper assumes that the underlying allocator will do "the
-    right thing" when xxfree() is called with a pointer internal to an
-    allocated object. Header-based allocators, for example, need not
-    apply.
-
-  - This wrapper also assumes that there is some way to lock all the
-    heaps used by a given allocator; however, such support is only
-    required by programs that also call fork(). In case your program
-    does not, the lock and unlock calls given below can be no-ops.
-
-*/
-
-
-#include <assert.h>
-
-extern "C" {
-
-  void * xxmalloc (size_t);
-  void   xxfree (void *);
-
-  /// Pending widespread support for sized deallocation.
-  /// void   xxfree_sized (void *, size_t);
- 
-  // Takes a pointer and returns how much space it holds.
-  size_t xxmalloc_usable_size (void *);
-
-  // Locks the heap(s), used prior to any invocation of fork().
-  void xxmalloc_lock ();
-
-  // Unlocks the heap(s), after fork().
-  void xxmalloc_unlock ();
-
-}
 
 // The interposition data structure (just pairs of function pointers),
 // used an interposition table like the following:
