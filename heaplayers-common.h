@@ -36,7 +36,8 @@ static constexpr size_t kCachelineSize = 64;
 #define HL_ATTRIBUTE_ALIGNED(s)
 #define HL_CACHELINE_ALIGNED
 #define HL_PAGE_ALIGNED
-#define HL_EXPORT
+// exported functions should use the cdecl calling convention on Windows
+#define HL_EXPORT __cdecl
 
 #define HL_LIKELY(x) x
 #define HL_UNLIKELY(x) x
