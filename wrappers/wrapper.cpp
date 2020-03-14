@@ -29,10 +29,6 @@
  * @brief  Replaces malloc with appropriate calls to TheCustomHeapType.
  * @author Emery Berger <http://www.cs.umass.edu/~emery>
  */
-
-#include <string.h> // for memcpy and memset
-#include <stdlib.h> // size_t
-#include <stdint.h>
 #include <new>
 
 

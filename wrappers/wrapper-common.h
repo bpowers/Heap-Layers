@@ -47,20 +47,67 @@
 #define HL_PREFIX(fn) HL_EXPORT_PREFIX##fn
 #endif
 
+// clang-format off
+#define HL_MALLOC(x)             HL_PREFIX(malloc)(x)
+#define HL_FREE(x)               HL_PREFIX(free)(x)
+#define HL_CFREE(x)              HL_PREFIX(cfree)(x)
+#define HL_REALLOC(x,y)          HL_PREFIX(realloc)(x,y)
+#define HL_CALLOC(x,y)           HL_PREFIX(calloc)(x,y)
+#define HL_MEMALIGN(x,y)         HL_PREFIX(memalign)(x,y)
+#define HL_POSIX_MEMALIGN(x,y,z) HL_PREFIX(posix_memalign)(x,y,z)
+#define HL_ALIGNED_ALLOC(x,y)    HL_PREFIX(aligned_alloc)(x,y)
+#define HL_GETSIZE(x)            HL_PREFIX(malloc_usable_size)(x)
+#define HL_GOODSIZE(x)           HL_PREFIX(malloc_good_size)(x)
+#define HL_VALLOC(x)             HL_PREFIX(valloc)(x)
+#define HL_PVALLOC(x)            HL_PREFIX(pvalloc)(x)
+#define HL_RECALLOC(x,y,z)       HL_PREFIX(recalloc)(x,y,z)
+#define HL_STRNDUP(s,sz)         HL_PREFIX(strndup)(s,sz)
+#define HL_STRDUP(s)             HL_PREFIX(strdup)(s)
+#define HL_GETCWD(b,s)           HL_PREFIX(getcwd)(b,s)
+#define HL_GETENV(s)             HL_PREFIX(getenv)(s)
+// clang-format on
+
+#ifdef __linux__
+// clang-format off
+#define HL_MALLOPT(x,y)          HL_PREFIX(mallopt)(x,y)
+#define HL_MALLOC_TRIM(s)        HL_PREFIX(malloc_trim)(s)
+#define HL_MALLOC_STATS(a)       HL_PREFIX(malloc_stats)(a)
+#define HL_MALLOC_GET_STATE(p)   HL_PREFIX(malloc_get_state)(p)
+#define HL_MALLOC_SET_STATE(p)   HL_PREFIX(malloc_set_state)(p)
+#define HL_MALLINFO(a)           HL_PREFIX(mallinfo)(a)
+// clang-format on
+#endif
+
 // these are all implemented by end-library as described above
 extern "C" {
-void *HL_PREFIX(malloc)(size_t);
-void HL_PREFIX(free)(void *);
 
-// Takes a pointer and returns how much space it holds.
-size_t HL_PREFIX(malloc_usable_size)(void *);
+// marking these as inline allows the compiler to inline their
+// definitions into e.g. `operator new`, removing branches and
+// improving performance.
+void *HL_ATTRIBUTE_INLINE HL_ATTRIBUTE_EXPORT HL_PREFIX(malloc)(size_t);
+void HL_ATTRIBUTE_INLINE HL_ATTRIBUTE_EXPORT HL_PREFIX(free)(void *);
+size_t HL_ATTRIBUTE_INLINE HL_ATTRIBUTE_EXPORT HL_PREFIX(malloc_usable_size)(void *);
 
-// its possible for a library to implement realloc directly
-#ifdef HL_HAVE_REALLOC
-void HL_PREFIX(realloc)(void *, size_t);
-#else
+void HL_ATTRIBUTE_INLINE HL_ATTRIBUTE_EXPORT HL_PREFIX(realloc)(void *, size_t);
+void *HL_ATTRIBUTE_INLINE HL_ATTRIBUTE_EXPORT HL_PREFIX(calloc)(size_t count, size_t size);
+
+// Pending widespread support for sized deallocation.
+// void HL_PREFIX(free_sized)(void *, size_t);
+
+// Locks the heap(s), used prior to any invocation of fork().
+void HL_PREFIX(malloc_lock)();
+
+// Unlocks the heap(s), after fork().
+void HL_PREFIX(malloc_unlock)();
+}
+
+// implementations can provide optimized versions of these, but
+// the generic ones aren't too shabby.
+extern "C" {
+
+#ifndef HL_HAVE_REALLOC
 // a single realloc implementation to rule them all
-inline void *HL_PREFIX(realloc)(void *oldPtr, size_t newSize) {
+void *HL_PREFIX(realloc)(void *oldPtr, size_t newSize) {
   if (oldPtr == nullptr) {
     return HL_PREFIX(malloc)(newSize);
   }
@@ -102,10 +149,8 @@ inline void *HL_PREFIX(realloc)(void *oldPtr, size_t newSize) {
 }
 #endif
 
-#ifdef HL_HAVE_CALLOC
-void *HL_PREFIX(calloc)(size_t count, size_t size);
-#else
-inline void *HL_PREFIX(calloc)(size_t count, size_t size) {
+#ifndef HL_HAVE_CALLOC
+void *HL_PREFIX(calloc)(size_t count, size_t size) {
   if (HL_UNLIKELY(size && count > (size_t)-1 / size)) {
     errno = ENOMEM;
     return nullptr;
@@ -120,15 +165,6 @@ inline void *HL_PREFIX(calloc)(size_t count, size_t size) {
   return ptr;
 }
 #endif
-
-// Pending widespread support for sized deallocation.
-// void HL_PREFIX(free_sized)(void *, size_t);
-
-// Locks the heap(s), used prior to any invocation of fork().
-void HL_PREFIX(malloc_lock)();
-
-// Unlocks the heap(s), after fork().
-void HL_PREFIX(malloc_unlock)();
 }
 
 #endif  // HL_WRAPPER_COMMON_H
