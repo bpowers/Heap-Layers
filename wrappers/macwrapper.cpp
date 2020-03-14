@@ -31,13 +31,13 @@
 extern "C" {
 
 void *HL_PREFIX(replace_malloc)(size_t sz) {
-  void *ptr = HL_PREFIX(malloc)(sz);
+  void *ptr = HL_MALLOC(sz);
   return ptr;
 }
 
 #if 0  // Disabled pending wider support for sized deallocation.
 void HL_PREFIX(replace_free_sized)(void * ptr, size_t sz) {
-  HL_PREFIX(free_sized)(ptr, sz);
+  HL_FREE_SIZED(ptr, sz);
 }
 #endif
 
@@ -45,49 +45,49 @@ size_t HL_PREFIX(replace_malloc_usable_size)(void *ptr) {
   if (ptr == nullptr) {
     return 0;
   }
-  return HL_PREFIX(malloc_usable_size)(ptr);
+  return HL_MALLOC_USABLE_SIZE(ptr);
 }
 
 void HL_PREFIX(replace_free)(void *ptr) {
-  HL_PREFIX(free)(ptr);
+  HL_FREE(ptr);
 }
 
 size_t HL_PREFIX(replace_malloc_good_size)(size_t sz) {
-  auto *ptr = HL_PREFIX(malloc)(sz);
-  auto objSize = HL_PREFIX(malloc_usable_size)(ptr);
-  HL_PREFIX(free)(ptr);
+  auto *ptr = HL_MALLOC(sz);
+  auto objSize = HL_MALLOC_USABLE_SIZE(ptr);
+  HL_FREE(ptr);
   return objSize;
 }
 
 void *HL_PREFIX(replace_realloc)(void *oldPtr, size_t newSize) {
-  return HL_PREFIX(realloc)(oldPtr, newSize);
+  return HL_REALLOC(oldPtr, newSize);
 }
 
-void *HL_PREFIX(replace_reallocf)(void *oldPtr, size_t sz) {
-  auto newPtr = HL_PREFIX(realloc)(oldPtr, newSize);
+void *HL_PREFIX(replace_reallocf)(void *oldPtr, size_t newSize) {
+  auto newPtr = HL_REALLOC(oldPtr, newSize);
   if (newPtr == nullptr) {
-    HL_PREFIX(free)(oldPtr);
+    HL_FREE(oldPtr);
   }
-
   return newPtr;
 }
 
 void *HL_PREFIX(replace_calloc)(size_t count, size_t size) {
-  return HL_PREFIX(calloc)(count, size);
+  return HL_CALLOC(count, size);
 }
 
-char *replace_strdup(const char *s) {
-  char *newString = NULL;
-  if (s != NULL) {
-    auto len = strlen(s) + 1UL;
-    if ((newString = (char *)replace_malloc(len))) {
-      memcpy(newString, s, len);
+char *HL_PREFIX(replace_strdup)(const char *origStr) {
+  char *newStr = nullptr;
+  if (HL_LIKELY(s != nullptr)) {
+    const auto len = strlen(s) + 1UL;
+    newStr = reinterpret_cast<char *>(HL_MALLOC(len));
+    if (HL_LIKELY(newStr != nullptr)) {
+      memcpy(newStr, origStr, len);
     }
   }
-  return newString;
+  return newStr;
 }
 
-void *replace_memalign(size_t alignment, size_t size) {
+void *HL_PREFIX(replace_memalign)(size_t alignment, size_t size) {
   // Check for non power-of-two alignment, or mistake in size.
   if (alignment < alignof(max_align_t)) {
     alignment = alignof(max_align_t);
@@ -102,13 +102,13 @@ void *replace_memalign(size_t alignment, size_t size) {
   }
   // Try to just allocate an object of the requested size.
   // If it happens to be aligned properly, just return it.
-  auto *ptr = replace_malloc(size);
+  auto *ptr = HL_MALLOC(size);
   if (((size_t)ptr & ~(alignment - 1)) == (size_t)ptr) {
     // It is already aligned just fine; return it.
     return ptr;
   }
   // It was not aligned as requested: free the object.
-  replace_free(ptr);
+  HL_FREE(ptr);
 
   // Force size to be a multiple of alignment.
   if (alignment < size) {
@@ -117,41 +117,41 @@ void *replace_memalign(size_t alignment, size_t size) {
     size = alignment;
   }
 
-  ptr = replace_malloc(size);
+  ptr = HL_MALLOC(size);
   // If the underlying malloc has "natural" alignment, this will work.
   if (((size_t)ptr & ~(alignment - 1)) == (size_t)ptr) {
     // It is already aligned just fine; return it.
     return ptr;
   }
   // It was not aligned as requested: free the object.
-  replace_free(ptr);
+  HL_FREE(ptr);
 
   // Now get a big chunk of memory and align the object within it.
   // NOTE: this assumes that the underlying allocator will be able
   // to free the aligned object, or ignore the free request.
-  auto *buf = replace_malloc(2 * alignment + size);
+  auto *buf = HL_MALLOC(2 * alignment + size);
   auto *alignedPtr = (void *)(((size_t)buf + alignment - 1) & ~(alignment - 1));
   return alignedPtr;
 }
 
 #if 0
-  void * replace_aligned_alloc (size_t alignment, size_t size) {
-    // Per the man page: "The function aligned_alloc() is the same as
-    // memalign(), except for the added restriction that size should be
-    // a multiple of alignment." Rather than check and potentially fail,
-    // we just enforce this by rounding up the size, if necessary.
-    size = size + alignment - (size % alignment);
-    return replace_memalign (alignment, size);
-  }
+void *HL_PREFIX(replace_aligned_alloc)(size_t alignment, size_t size) {
+  // Per the man page: "The function aligned_alloc() is the same as
+  // memalign(), except for the added restriction that size should be
+  // a multiple of alignment." Rather than check and potentially fail,
+  // we just enforce this by rounding up the size, if necessary.
+  size = size + alignment - (size % alignment);
+  return HL_MEMALIGN(alignment, size);
+}
 #endif
 
-int replace_posix_memalign(void **memptr, size_t alignment, size_t size) {
+int HL_PREFIX(replace_posix_memalign)(void **memptr, size_t alignment, size_t size) {
   // Check for non power-of-two alignment.
-  if ((alignment == 0) || (alignment & (alignment - 1))) {
+  if (HL_UNLIKELY((alignment == 0) || (alignment & (alignment - 1)))) {
     return EINVAL;
   }
-  auto *ptr = replace_memalign(alignment, size);
-  if (!ptr) {
+  auto *ptr = HL_MEMALIGN(alignment, size);
+  if (HL_UNLIKELY(ptr == nullptr)) {
     return ENOMEM;
   } else {
     *memptr = ptr;
@@ -159,14 +159,12 @@ int replace_posix_memalign(void **memptr, size_t alignment, size_t size) {
   }
 }
 
-void *replace_valloc(size_t sz) {
-  // Equivalent to memalign(pagesize, sz).
-  void *ptr = replace_memalign(PAGE_SIZE, sz);
-  return ptr;
+void *HL_PREFIX(replace_valloc)(size_t sz) {
+  return HL_MEMALIGN(HL::kPageSize, sz);
 }
 
-void replace_vfree(void *ptr) {
-  replace_free(ptr);
+void HL_PREFIX(replace_vfree)(void *ptr) {
+  HL_FREE(ptr);
 }
 }
 
