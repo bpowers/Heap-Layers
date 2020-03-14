@@ -130,40 +130,6 @@ extern "C" {
 
 #include <stdio.h>
 
-// since we're in a cpp file, marking these as inline allows the
-// compiler to inline their definitions into e.g. `operator new`,
-// removing branches and improving performance.
-extern "C" void MYCDECL HEAP_LAYERS_INLINE CUSTOM_FREE(void *);
-extern "C" void * MYCDECL HEAP_LAYERS_INLINE CUSTOM_MALLOC(size_t);
-extern "C" void * MYCDECL HEAP_LAYERS_INLINE CUSTOM_CALLOC(size_t nelem, size_t elsize);
-
-extern "C" void MYCDECL CUSTOM_FREE (void * ptr)
-{
-  xxfree (ptr);
-}
-
-extern "C" void * MYCDECL CUSTOM_MALLOC(size_t sz)
-{
-  void * ptr = xxmalloc(sz);
-  return ptr;
-}
-
-extern "C" void * MYCDECL CUSTOM_CALLOC(size_t nelem, size_t elsize)
-{
-  size_t n = nelem * elsize;
-  
-  if (elsize && (nelem != n / elsize)) {
-    return nullptr;
-  }
-  
-  void * ptr = xxmalloc(n);
-
-  // Zero out the malloc'd block.
-  if (ptr != nullptr) {
-    memset (ptr, 0, n);
-  }
-  return ptr;
-}
 
 
 #if !defined(_WIN32)
